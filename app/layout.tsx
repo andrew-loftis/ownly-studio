@@ -1,0 +1,76 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "@/styles/globals.css";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import AuthEffect from "@/components/AuthEffect";
+import AuthModal from "@/components/AuthModal";
+import RouteTransition from "@/components/RouteTransition";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Ownly Studio — All your digital, one place.",
+  description:
+    "Web, apps, AI, automations, and payments—unified under one subscription. Cinematic design. Serious engineering.",
+  openGraph: {
+    title: "Ownly Studio — All your digital, one place.",
+    description:
+      "Web, apps, AI, automations, and payments—unified under one subscription. Cinematic design. Serious engineering.",
+    url: "https://ownly.studio",
+    siteName: "Ownly Studio",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Ownly Studio OG Image",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ownly Studio — All your digital, one place.",
+    description:
+      "Web, apps, AI, automations, and payments—unified under one subscription. Cinematic design. Serious engineering.",
+    images: ["/twitter-image.png"],
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className="dark">
+      <head>
+        <link rel="canonical" href="https://ownly.studio" />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+      >
+        <AuthEffect />
+        <AuthModal />
+        <Header />
+        <RouteTransition>
+          {children}
+        </RouteTransition>
+        <Footer />
+      </body>
+    </html>
+  );
+}

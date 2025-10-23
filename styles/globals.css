@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  /* Dark-native design system tokens */
+  --bg-1: #0b0c10;
+  --bg-2: #0f1117;
+  --panel: #111318;
+  --txt: #e8eaed;
+  --muted: #9aa3af;
+  --mint: #22e4c4;
+  --cyan: #5de0e6;
+  --coral: #ff5a5f;
+  
+  /* Legacy token mappings for compatibility */
+  --background: var(--bg-1);
+  --foreground: var(--txt);
+  
+  /* Glass and tactile effects */
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.02);
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(34, 228, 196, 0.15);
+  --noise-grain: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* Global grain layer */
+html::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--noise-grain);
+  pointer-events: none;
+  z-index: -1;
+}
+
+body {
+  background: var(--bg-1);
+  color: var(--txt);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* Frosted glass utility classes */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Tactile stone surface for interactive elements */
+.tactile {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    var(--shadow-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.tactile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--noise-grain);
+  opacity: 0.4;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.tactile::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  border-radius: inherit;
+}
+
+/* Interactive states */
+.tactile:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    var(--shadow-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--shadow-glow);
+}
+
+.tactile:active {
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
