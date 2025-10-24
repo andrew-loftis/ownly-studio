@@ -111,6 +111,7 @@ export default function WorkPage() {
               video={p.video}
               metric={p.metric}
               category={p.category}
+              images={p.images}
             />
           ))}
         </div>
