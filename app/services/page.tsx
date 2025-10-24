@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import SectionHeading from "@/components/SectionHeading";
+import { FeatureChecklist, FAQ, CTASection } from "@/components/premium";
 
 const services = [
   {
@@ -12,6 +12,7 @@ const services = [
     features: ["MVP in 2 weeks", "Core features only", "Mobile-first"],
     price: "Quick start",
     gradient: "from-[var(--mint)] to-[var(--cyan)]",
+    includedFeatures: ["Website", "Basic auth", "Mobile responsive", "SSL & hosting", "Basic analytics"]
   },
   {
     name: "Pro",
@@ -20,6 +21,7 @@ const services = [
     price: "Full featured",
     gradient: "from-[var(--cyan)] to-[var(--coral)]",
     popular: true,
+    includedFeatures: ["Everything in Launch", "User dashboards", "API integrations", "Advanced analytics", "Email automation"]
   },
   {
     name: "Platform",
@@ -27,29 +29,64 @@ const services = [
     features: ["Custom AI models", "DevOps pipeline", "Multi-tenant", "White label"],
     price: "Enterprise ready",
     gradient: "from-[var(--coral)] to-[var(--mint)]",
+    includedFeatures: ["Everything in Pro", "Custom AI models", "Multi-tenant architecture", "White label options", "24/7 support"]
   },
+];
+
+const comparisonFeatures = [
+  { name: "Pages", launch: "5", pro: "Unlimited", platform: "Unlimited" },
+  { name: "Auth", launch: "Basic", pro: "Advanced", platform: "Enterprise SSO" },
+  { name: "AI", launch: "—", pro: "Basic", platform: "Custom models" },
+  { name: "Automations", launch: "—", pro: "5/month", platform: "Unlimited" },
+  { name: "Payments", launch: "—", pro: "Stripe", platform: "Multi-gateway" },
+  { name: "CMS", launch: "—", pro: "Included", platform: "Headless + UI" },
+  { name: "Email", launch: "—", pro: "Transactional", platform: "Marketing suite" },
+  { name: "SLA", launch: "Community", pro: "Business hours", platform: "24/7 dedicated" },
+];
+
+const faqItems = [
+  {
+    question: "How does the subscription model work?",
+    answer: "One monthly fee covers hosting, updates, support, and ongoing development. No hidden costs or surprise bills."
+  },
+  {
+    question: "What's the typical timeline?",
+    answer: "Launch: 2-3 weeks. Pro: 4-6 weeks. Platform: 8-12 weeks. We'll provide a detailed timeline after your discovery call."
+  },
+  {
+    question: "Do I own the code when complete?",
+    answer: "Yes, you receive full source code and can export everything. The subscription covers hosting and ongoing updates."
+  },
+  {
+    question: "Can I upgrade my plan later?",
+    answer: "Absolutely. You can upgrade anytime and we'll migrate your existing features to the new tier seamlessly."
+  }
 ];
 
 export default function ServicesPage() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
 
   return (
-    <main className="flex-1 py-24 px-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="flex-1 py-24 px-4">
+      <div className="max-w-6xl mx-auto space-y-24">
         {/* Header */}
         <div className="text-center mb-16">
-          <SectionHeading 
-            kicker="Services"
-            title="Pick your speed"
-            className="mb-4"
-          />
-          <p className="text-[var(--muted)] text-lg max-w-2xl mx-auto">
+          <p className="text-xs uppercase tracking-wide text-[var(--txt-tertiary)] font-medium mb-4">
+            Services
+          </p>
+          <h1 className="text-4xl md:text-5xl font-bold text-[var(--txt-primary)] mb-4">
+            Pick your{" "}
+            <span className="gradient-text-bright">
+              speed
+            </span>
+          </h1>
+          <p className="text-[var(--txt-secondary)] text-lg max-w-2xl mx-auto">
             From rapid prototypes to enterprise platforms. All roads lead to shipped.
           </p>
         </div>
 
         {/* Service cards */}
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
+        <div className="grid md:grid-cols-3 gap-8">
           {services.map((service, index) => (
             <div
               key={service.name}
@@ -101,21 +138,15 @@ export default function ServicesPage() {
 
                   {/* Title & Description */}
                   <div>
-                    <h3 className="text-2xl font-bold text-[var(--txt)] mb-2">{service.name}</h3>
-                    <p className="text-[var(--muted)] text-lg">{service.description}</p>
+                    <h3 className="text-2xl font-bold text-[var(--txt-primary)] mb-2">{service.name}</h3>
+                    <p className="text-[var(--txt-secondary)] text-lg">{service.description}</p>
                   </div>
 
                   {/* Features */}
-                  <ul className="space-y-3">
-                    {service.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-center text-sm text-[var(--txt)]">
-                        <svg className="w-4 h-4 text-[var(--mint)] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
+                  <FeatureChecklist 
+                    items={service.features}
+                    className="mb-6"
+                  />
 
                   {/* Price */}
                   <div className="pt-4 border-t border-white/10">
@@ -127,18 +158,88 @@ export default function ServicesPage() {
           ))}
         </div>
 
-        {/* CTA */}
-        <div className="text-center">
-          <Link href="/build">
-            <Button variant="primary" size="lg">
-              Request proposal
-            </Button>
-          </Link>
-          <p className="text-[var(--muted)] text-sm mt-4">
-            30-minute discovery call. No commitment required.
-          </p>
+        {/* Comparison Grid */}
+        <section className="space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-[var(--txt-primary)] mb-2">
+              Compare{" "}
+              <span className="gradient-text-bright">
+                plans
+              </span>
+            </h2>
+            <p className="text-[var(--txt-secondary)]">What's included in each tier</p>
+          </div>
+
+          <div className="glass-strong rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left p-4 text-[var(--txt-primary)] font-medium">Feature</th>
+                    <th className="text-center p-4 text-[var(--txt-primary)] font-medium">Launch</th>
+                    <th className="text-center p-4 text-[var(--txt-primary)] font-medium">Pro</th>
+                    <th className="text-center p-4 text-[var(--txt-primary)] font-medium">Platform</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonFeatures.map((feature, index) => (
+                    <tr key={feature.name} className={index < comparisonFeatures.length - 1 ? "border-b border-white/5" : ""}>
+                      <td className="p-4 text-[var(--txt-primary)] font-medium">{feature.name}</td>
+                      <td className="p-4 text-center text-[var(--txt-secondary)] text-sm">{feature.launch}</td>
+                      <td className="p-4 text-center text-[var(--txt-secondary)] text-sm">{feature.pro}</td>
+                      <td className="p-4 text-center text-[var(--txt-secondary)] text-sm">{feature.platform}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        {/* Feature Details */}
+        <section className="grid md:grid-cols-3 gap-8">
+          {services.map((service, index) => (
+            <div key={service.name} className="space-y-4">
+              <h3 className="text-lg font-bold text-[var(--txt-primary)]">{service.name} includes</h3>
+              <FeatureChecklist 
+                items={service.includedFeatures}
+              />
+            </div>
+          ))}
+        </section>
+
+        {/* FAQ */}
+        <FAQ 
+          items={faqItems}
+          title="Common questions"
+        />
+
+        {/* CTA Sections */}
+        <div className="space-y-8">
+          <CTASection
+            title="Show me what's included"
+            description="Jump to the comparison grid to see exactly what each tier offers."
+            primaryAction={{
+              text: "View comparison",
+              href: "#compare"
+            }}
+            secondaryAction={{
+              text: "Browse examples",
+              href: "/work"
+            }}
+          />
+
+          <CTASection
+            title="Start a proposal"
+            description="30-minute discovery call. No commitment required."
+            primaryAction={{
+              text: "Configure & quote",
+              href: "/build"
+            }}
+            gradient="from-[var(--cyan)]/10 to-[var(--coral)]/5"
+          />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

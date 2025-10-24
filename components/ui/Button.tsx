@@ -16,22 +16,22 @@ export default function Button({
   return (
     <button
       className={cn(
-        // Base styles - tactile stone surface
-        "relative inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 disabled:opacity-50 disabled:pointer-events-none tactile",
+        // Base styles with improved contrast and matching focus radius
+        "relative inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mint)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-1)] disabled:opacity-50 disabled:pointer-events-none",
         
-        // Size variants
-        size === "sm" && "px-3 py-1.5 text-sm rounded-md",
-        size === "md" && "px-4 py-2 text-sm rounded-md",
-        size === "lg" && "px-6 py-3 text-base rounded-lg",
+        // Size variants with matching focus radius
+        size === "sm" && "px-3 py-2 text-sm rounded-lg btn-focus-lg",
+        size === "md" && "px-5 py-2.5 text-sm rounded-lg btn-focus-lg", 
+        size === "lg" && "px-7 py-3.5 text-base rounded-xl btn-focus-xl",
         
-        // Primary variant - mint to cyan gradient with glass edge
-        variant === "primary" && "bg-gradient-to-r from-[#22e4c4] to-[#5de0e6] text-black font-semibold border-0 shadow-[0_0_20px_rgba(34,228,196,0.25)] hover:shadow-[0_0_25px_rgba(34,228,196,0.35)] hover:scale-[1.02] active:scale-[0.98]",
+        // Primary variant - enhanced mint to cyan gradient
+        variant === "primary" && "bg-gradient-to-r from-[var(--mint)] to-[var(--cyan)] text-black font-semibold border-0 shadow-[0_4px_12px_rgba(16,242,200,0.2)] hover:shadow-[0_8px_24px_rgba(16,242,200,0.3)] hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0 before:absolute before:inset-0 before:rounded-[inherit] before:bg-gradient-to-r before:from-white/10 before:to-transparent before:pointer-events-none",
         
-        // Ghost variant - thin glass border
-        variant === "ghost" && "bg-transparent text-[#e8eaed] border border-[rgba(255,255,255,0.08)] hover:border-white/20 hover:bg-white/5 active:bg-white/10",
+        // Ghost variant - enhanced glass effect
+        variant === "ghost" && "bg-[var(--glass-bg)] backdrop-blur-sm text-[var(--txt-secondary)] border border-[var(--border-1)] hover:border-[var(--border-2)] hover:bg-[var(--glass-strong-bg)] hover:text-[var(--txt-primary)] hover:-translate-y-0.5 active:translate-y-0",
         
-        // Pill variant - rounded full
-        variant === "pill" && "rounded-full bg-[#111318] text-[#e8eaed] border border-white/10 hover:border-white/20 hover:bg-[#0f1117]",
+        // Pill variant - tactile surface with full radius focus
+        variant === "pill" && "rounded-full btn-focus-full bg-[var(--bg-3)] text-[var(--txt-secondary)] border border-[var(--border-1)] hover:border-[var(--border-2)] hover:bg-[var(--bg-4)] hover:text-[var(--txt-primary)]",
         
         className
       )}

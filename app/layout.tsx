@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://ownly.studio'),
   title: "Ownly Studio — All your digital, one place.",
   description:
     "Web, apps, AI, automations, and payments—unified under one subscription. Cinematic design. Serious engineering.",
@@ -63,11 +64,18 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
+        {/* Skip link for accessibility */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        
         <AuthEffect />
         <AuthModal />
         <Header />
         <RouteTransition>
-          {children}
+          <main id="main-content">
+            {children}
+          </main>
         </RouteTransition>
         <Footer />
       </body>

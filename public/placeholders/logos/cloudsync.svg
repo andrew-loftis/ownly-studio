@@ -1,0 +1,6 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="8" y="14" width="6" height="12" rx="1" fill="currentColor" opacity="0.3"/>
+  <rect x="16" y="10" width="6" height="20" rx="1" fill="currentColor" opacity="0.3"/>
+  <rect x="24" y="16" width="6" height="14" rx="1" fill="currentColor" opacity="0.3"/>
+  <text x="36" y="24" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="currentColor" opacity="0.7">CloudSync</text>
+</svg>

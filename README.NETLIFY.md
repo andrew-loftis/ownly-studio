@@ -1,21 +1,27 @@
 Netlify deployment notes
 
-Use the Netlify Next.js plugin (@netlify/plugin-nextjs) which supports Next features and App Router.
+Use the Netlify Next.js Runtime (`@netlify/plugin-nextjs`) which supports Next.js App Router, SSR/ISR, and routing on Netlify.
 
-Quick steps:
+Quick steps (monorepo-friendly):
 
-1. Install plugin locally (optional):
+1) Connect the GitHub repo in Netlify.
 
-   npm i -D @netlify/plugin-nextjs
+2) Build settings (Site settings → Build & deploy → Build settings → Edit):
 
-2. Add `netlify.toml` (already added to the repo).
+   - Base directory: `ownly-studio`  ← important (your Next.js app lives in this subfolder)
+   - Build command: `npm run build`
+   - Publish directory: leave BLANK (let the plugin manage outputs)
+   - Functions directory: leave BLANK
 
-3. In Netlify UI, connect the repo, and set build command: `npm run build` and publish directory: `.next`.
+3) Environment variables: add the keys from `.env.example` as needed (e.g., Firebase/Stripe/OpenAI). Also set `NODE_VERSION` to `18` or `20` (matches local).
 
-4. Add environment variables in the Netlify site settings (the keys in `.env.example`).
+4) The repo already includes `netlify.toml` with the Next.js plugin enabled. No extra UI plugin configuration required.
 
-5. If you see a 404 for routes, ensure the Netlify plugin is enabled and your Node version matches (use `18` or `20`).
+5) Trigger a deploy.
 
-Notes:
-- Do NOT use a static redirect to /index.html for Next App Router—the plugin handles routes. If you still get 404s, enable plugin and remove manual redirects.
-- For edge functions or advanced rewrites, configure through Netlify plugin docs.
+Troubleshooting:
+- 404s after deploy: usually caused by setting a custom Publish directory (e.g., `.next`). Clear Publish/Functions fields so the Next.js plugin can handle routing and outputs.
+- Build fails at root: if your repo root also contains a `package.json` without a `build` script, set Base directory to `ownly-studio` so Netlify runs in the correct folder (and picks up `netlify.toml` there).
+- Node version mismatch: Set `NODE_VERSION` in Site settings → Environment.
+- Sitemaps: The build runs `next-sitemap` after `next build`. If you want a canonical URL, set `NEXT_PUBLIC_SITE_URL` in the site environment.
+- Avoid custom redirects to `/index.html`; the plugin manages App Router routes automatically.
