@@ -7,6 +7,7 @@
     "build": "next build && next-sitemap",
     "start": "next start",
   "optimize:images": "node scripts/optimize-images.mjs",
+    "deploy:prod": "netlify deploy --prod",
     "sitemap": "next-sitemap",
     "lint": "eslint"
   },

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import ProjectTile from "@/components/ProjectTile";
 import { FilterChip } from "@/components/premium";
-import { projects, type WorkCategory } from "@/lib/work";
+import { projects, type WorkCategory, type Project } from "@/lib/work";
 
 const tabs: WorkCategory[] = ["Websites", "Apps", "Agents"];
 const industries = ["All", "E-commerce", "SaaS", "Healthcare", "Education", "Finance", "Entertainment"];
@@ -99,12 +99,18 @@ export default function WorkPage() {
           </p>
         </div>
 
-        {/* Grid */}
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {/* Mobile carousel (swipe left/right) */}
+        <div className="md:hidden -mx-4">
+          <WorkMobileCarousel items={filtered} />
+        </div>
+
+        {/* Grid (desktop/tablet) */}
+        <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 gap-6">
           {filtered.map((p) => (
             <ProjectTile
               key={p.slug}
               href={`/examples?slug=${p.slug}`}
+              slug={p.slug}
               title={p.title}
               outcome={p.outcome}
               thumbnail={p.thumbnail}
@@ -112,6 +118,10 @@ export default function WorkPage() {
               metric={p.metric}
               category={p.category}
               images={p.images}
+              result={p.result}
+              stack={p.stack}
+              industry={p.industry}
+              year={p.year}
             />
           ))}
         </div>
@@ -141,6 +151,97 @@ export default function WorkPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function WorkMobileCarousel({ items }: { items: Project[] }) {
+  // Client-only mobile carousel with lock and onboarding hint
+  const [locked, setLocked] = useState(false);
+  const [showHint, setShowHint] = useState(true);
+  const [current, setCurrent] = useState(0);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  // Hide hint after a moment
+  useEffect(() => {
+    const t = setTimeout(() => setShowHint(false), 1600);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Track centered slide index while scrolling
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        const children = Array.from(el.children) as HTMLElement[];
+        children.forEach((child, idx) => {
+          const cRect = child.getBoundingClientRect();
+          const cCenter = cRect.left + cRect.width / 2;
+          const d = Math.abs(cCenter - centerX);
+          if (d < bestDist) { bestDist = d; bestIdx = idx; }
+        });
+        setCurrent(bestIdx);
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    // initial index
+    onScroll();
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="relative">
+      {/* hint bubble */}
+      {showHint && items.length > 1 && (
+        <div className="absolute top-0 right-4 z-10 text-[10px] text-white/90 bg-black/50 border border-white/10 rounded-full px-2 py-1 backdrop-blur-sm">
+          Swipe →
+        </div>
+      )}
+      <div
+        ref={trackRef}
+        className={`flex gap-4 px-4 ${locked ? 'overflow-x-hidden' : 'overflow-x-auto'} snap-x snap-mandatory scroll-smooth`}
+        style={{ touchAction: (locked ? 'pan-y' : 'pan-x') as any, transform: showHint ? 'translateX(-12px)' : 'translateX(0)', transition: 'transform 420ms ease' }}
+      >
+        {items.map((p, i) => (
+          <div key={p.slug} className="snap-center shrink-0 w-[88vw]">
+            <div className="relative">
+              <ProjectTile
+                href={`/examples?slug=${p.slug}`}
+                slug={p.slug}
+                title={p.title}
+                outcome={p.outcome}
+                thumbnail={p.thumbnail}
+                video={p.video}
+                metric={p.metric}
+                category={p.category}
+                images={p.images}
+                result={p.result}
+                stack={p.stack}
+                industry={p.industry}
+                year={p.year}
+                active={i === current}
+              />
+              <button
+                className={`absolute top-3 right-5 z-10 text-[10px] rounded-full px-2 py-1 border ${locked ? 'bg-[var(--mint)]/30 border-[var(--mint)]/40 text-[var(--mint)]' : 'bg-black/40 border-white/10 text-white/80'} backdrop-blur`}
+                onClick={() => setLocked((v) => !v)}
+              >
+                {locked ? 'Unlock' : 'Lock'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Nudge animation handled via inline transform style above */}
     </div>
   );
 }
