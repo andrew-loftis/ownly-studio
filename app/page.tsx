@@ -87,31 +87,37 @@ export default function Home() {
       />
       
       {/* Hero section */}
-      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center px-4">
+      <section ref={heroRef} className="relative md:min-h-screen min-h-[70vh] flex items-center justify-center px-4">
+        {/* Mobile step hint */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 sm:hidden">
+          <div className="px-3 py-1 rounded-full text-[11px] glass-strong border border-white/10 text-[var(--txt-tertiary)]">
+            Explore → Build → Launch
+          </div>
+        </div>
         <div className="text-center space-y-8 max-w-4xl mx-auto">
           <div className="space-y-4">
             <p className="text-sm font-medium uppercase tracking-wide text-[var(--mint)] drop-shadow-sm">
               One subscription. Everything unified.
             </p>
-            <h1 className="text-5xl md:text-7xl font-bold text-[var(--txt-primary)] leading-tight drop-shadow-lg">
+            <h1 className="text-4xl md:text-7xl font-bold text-[var(--txt-primary)] leading-tight drop-shadow-lg">
               All your digital—
               <span className="text-transparent bg-gradient-to-r from-[var(--mint)] to-[var(--cyan)] bg-clip-text drop-shadow-none">
                 one place
               </span>
             </h1>
-            <p className="text-xl text-[var(--txt-secondary)] max-w-2xl mx-auto leading-relaxed">
+            <p className="text-lg md:text-xl text-[var(--txt-secondary)] max-w-2xl mx-auto leading-relaxed">
               <span className="text-[var(--txt-tertiary)]">Too many tools. Not enough together.</span>
             </p>
           </div>
           
-          <div className="flex gap-6 justify-center items-center">
+          <div className="flex gap-3 md:gap-6 justify-center items-center">
             <Link href="/build">
-              <Button variant="primary" size="lg">
+              <Button variant="primary" size="lg" className="sm:px-8 sm:py-3 px-6 py-2.5">
                 Start Building
               </Button>
             </Link>
             <Link href="/work">
-              <Button variant="ghost" size="lg">
+              <Button variant="ghost" size="lg" className="sm:px-8 sm:py-3 px-6 py-2.5">
                 See Our Work
               </Button>
             </Link>

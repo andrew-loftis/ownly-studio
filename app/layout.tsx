@@ -6,6 +6,8 @@ import Footer from "@/components/Footer";
 import AuthEffect from "@/components/AuthEffect";
 import AuthModal from "@/components/AuthModal";
 import RouteTransition from "@/components/RouteTransition";
+import ThemeBackdrop from "@/components/ThemeBackdrop";
+import MobileTabBar from "@/components/layout/MobileTabBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -72,11 +74,14 @@ export default function RootLayout({
         <AuthEffect />
         <AuthModal />
         <Header />
+        {/* Global liquid glass + dotted grid backdrop */}
+        <ThemeBackdrop />
         <RouteTransition>
-          <main id="main-content">
+          <main id="main-content" className="sm:pb-0 pb-20">
             {children}
           </main>
         </RouteTransition>
+        <MobileTabBar />
         <Footer />
       </body>
     </html>

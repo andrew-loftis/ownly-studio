@@ -1,24 +1,25 @@
 // Pricing rules (edit constants as needed)
-export const WEBSITE_SETUP = 4000;
+// Core baselines (more realistic ballparks)
+export const WEBSITE_SETUP = 6000;
 export const WEBSITE_MONTHLY = 150;
 
-export const WEBAPP_SETUP = 8000;
-export const WEBAPP_MONTHLY = 350;
+export const WEBAPP_SETUP = 12000;
+export const WEBAPP_MONTHLY = 400;
 
-export const AI_SETUP = 2000;
-export const AI_MONTHLY = 200;
+export const AI_SETUP = 3000;
+export const AI_MONTHLY = 150;
 
-export const AUTOMATIONS_SETUP = 1500;
-export const AUTOMATIONS_MONTHLY = 150;
+export const AUTOMATIONS_SETUP = 2000;
+export const AUTOMATIONS_MONTHLY = 100;
 
-export const PAYMENTS_SETUP = 1500;
-export const PAYMENTS_MONTHLY = 100;
+export const PAYMENTS_SETUP = 2500;
+export const PAYMENTS_MONTHLY = 120;
 
-export const CMS_SETUP = 1200;
-export const CMS_MONTHLY = 120;
+export const CMS_SETUP = 1500;
+export const CMS_MONTHLY = 80;
 
-export const EMAIL_SETUP = 600;
-export const EMAIL_MONTHLY = 40;
+export const EMAIL_SETUP = 300;
+export const EMAIL_MONTHLY = 15;
 
 export type FeatureKey =
 	| "website"
@@ -62,8 +63,9 @@ export const BASE_PRICES: Record<FeatureKey, Line> = {
 	email: { setup: EMAIL_SETUP, monthly: EMAIL_MONTHLY },
 };
 
-// Synergy: if webapp + ai, add +10% setup on those two lines only
-const SYNERGY_PERCENT_WEBAPP_AI = 0.1; // 10%
+// Bundle adjustments (discounts that match typical scope overlaps)
+const DISCOUNT_WEBSITE_PLUS_CMS = 0.1; // 10% off Website setup when CMS included
+const DISCOUNT_WEBSITE_PLUS_PAYMENTS = 0.1; // 10% off Payments setup when Website included
 
 export function price(features: Features): Quote {
 	const breakdown: Record<FeatureKey, Line> = {
@@ -78,17 +80,19 @@ export function price(features: Features): Quote {
 
 	// Add base lines for selected features
 	(Object.keys(features) as FeatureKey[]).forEach((k) => {
-		if (features[k]) {
+			if (features[k]) {
 			const base = BASE_PRICES[k];
 			breakdown[k] = { setup: base.setup, monthly: base.monthly };
 		}
 	});
 
-	// Apply synergy only if both are on
-	if (features.webapp && features.ai) {
-		breakdown.webapp.setup = Math.round(breakdown.webapp.setup * (1 + SYNERGY_PERCENT_WEBAPP_AI));
-		breakdown.ai.setup = Math.round(breakdown.ai.setup * (1 + SYNERGY_PERCENT_WEBAPP_AI));
-	}
+		// Bundle discounts
+		if (features.website && features.cms) {
+			breakdown.website.setup = Math.round(breakdown.website.setup * (1 - DISCOUNT_WEBSITE_PLUS_CMS));
+		}
+		if (features.website && features.payments) {
+			breakdown.payments.setup = Math.round(breakdown.payments.setup * (1 - DISCOUNT_WEBSITE_PLUS_PAYMENTS));
+		}
 
 	// Sum totals
 	const totals = (Object.keys(breakdown) as FeatureKey[]).reduce(
