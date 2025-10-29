@@ -14,19 +14,33 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.10.0'
+          cache: 'npm'
+          cache-dependency-path: ownly-studio/package-lock.json
 
       - name: Install dependencies
+        working-directory: ownly-studio
         run: npm ci
 
-      - name: Netlify build
-        run: npx netlify build
+      - name: Pull Netlify environment variables (production)
+        working-directory: ownly-studio
+        run: |
+          npx netlify env:pull --yes --environment=production --file=.env
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Netlify build (with Next.js plugin)
+        working-directory: ownly-studio
+        run: npx netlify build --context=production
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
       - name: Deploy to Netlify (prod)
-        run: npx netlify deploy --prod --dir=.netlify/build
+        working-directory: ownly-studio
+        run: |
+          npx netlify deploy --prod --dir=.netlify/build --functions=.netlify/functions --message "GH Actions deploy"
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
