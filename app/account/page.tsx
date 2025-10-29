@@ -1,9 +1,26 @@
 "use client";
 
-export const dynamic = "force-dynamic";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/lib/authStore";
+import { userIsAnyOrgAdmin } from "@/lib/roles";
 
-import AccountClient from "./AccountClient";
+export default function AccountIndexPage() {
+  const user = useAuthStore((s) => s.user);
+  const openModal = useAuthStore((s) => s.openModal);
+  const router = useRouter();
 
-export default function AccountPage() {
-  return <AccountClient />;
+  useEffect(() => {
+    const run = async () => {
+      if (!user) {
+        openModal("signin");
+        return;
+      }
+      const isAdmin = await userIsAnyOrgAdmin(user.uid);
+      router.replace(isAdmin ? "/account/admin" : "/account/client");
+    };
+    run();
+  }, [user]);
+
+  return null;
 }

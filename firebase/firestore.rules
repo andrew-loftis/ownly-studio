@@ -4,6 +4,8 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isSiteStaff() { return isSignedIn() && (request.auth.token.admin == true || request.auth.token.siteRole in ['superadmin', 'staff']); }
+    function isIn(arr, val) { return arr != null && val in arr; }
 
     // User profiles: users/{uid}
     match /users/{uid} {
@@ -27,6 +29,62 @@ service cloud.firestore {
       allow read: if isAdmin() || (isSignedIn() && docId == request.auth.uid);
       // Client writes not allowed; Admin SDK bypasses these rules on the server.
       allow create, update, delete: if isAdmin();
+    }
+
+    // Organizations and RBAC
+    match /orgs/{orgId} {
+      allow read: if isSignedIn() && (
+        isIn(resource.data.adminUids, request.auth.uid) ||
+        isIn(resource.data.editorUids, request.auth.uid) ||
+        isIn(resource.data.clientUids, request.auth.uid) ||
+        isSiteStaff()
+      );
+
+      // Create org: any signed-in user can create and become admin on that org
+      allow create: if isSignedIn() &&
+        request.resource.data.adminUids is list &&
+        request.auth.uid in request.resource.data.adminUids;
+
+      // Update/delete org: only org admins or site staff
+      allow update, delete: if isSignedIn() && (
+        isIn(resource.data.adminUids, request.auth.uid) || isSiteStaff()
+      );
+
+      // Members (optional future: if you later add subcollection)
+      match /members/{memberUid} {
+        allow read: if isSignedIn() && (request.auth.uid == memberUid || isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) || isSiteStaff());
+        allow write: if isSignedIn() && (isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) || isSiteStaff());
+      }
+
+      // Projects
+      match /projects/{projectId} {
+        allow read: if isSignedIn() && (
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
+          isIn(resource.data.assignedClientUids, request.auth.uid) ||
+          isSiteStaff()
+        );
+        allow create, update, delete: if isSignedIn() && (
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
+          isSiteStaff()
+        );
+      }
+
+      // Deliverables
+      match /deliverables/{deliverableId} {
+        allow read: if isSignedIn() && (
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
+          isIn(resource.data.assignedClientUids, request.auth.uid) ||
+          isSiteStaff()
+        );
+        allow create, update, delete: if isSignedIn() && (
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
+          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
+          isSiteStaff()
+        );
+      }
     }
 
     // Deny everything else by default
