@@ -1,5 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
+import DotField from "@/components/background/DotField";
 
 export default function ThemeBackdrop() {
   return (
@@ -12,16 +13,21 @@ export default function ThemeBackdrop() {
         transition={{ duration: 0.4 }}
         className="pointer-events-none fixed inset-0 -z-10"
       >
-        {/* dotted grid */}
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:14px_14px]" />
-        {/* ambient top wash */}
-        <div
-          className="absolute inset-x-0 top-0 h-1/2 opacity-30"
-          style={{ backgroundImage: 'linear-gradient(180deg, var(--cyan), transparent 60%)' }}
-        />
-        {/* animated liquid orbs (very subtle) */}
-        <div className="absolute -top-32 -right-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-25 animate-[orb_16s_ease_infinite]" style={{ background: 'radial-gradient(closest-side, var(--cyan), transparent 70%)' }} />
-        <div className="absolute -bottom-40 -left-28 w-[520px] h-[520px] rounded-full blur-3xl opacity-20 animate-[orb_18s_ease_infinite]" style={{ background: 'radial-gradient(closest-side, var(--mint), transparent 70%)' }} />
+        {/* site-wide interactive dot grid */}
+        <DotField fixed density={28} radius={250} baseAlpha={0.035} peakAlpha={0.65} color="#f2fffb" />
+        {/* softer mixed accents instead of a solid top wash */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute -top-24 left-[10%] w-[420px] h-[420px] rounded-full blur-3xl opacity-10"
+            style={{ background: 'radial-gradient(closest-side, var(--cyan), transparent 70%)' }}
+          />
+          <div
+            className="absolute -top-40 right-[8%] w-[380px] h-[380px] rounded-full blur-3xl opacity-8"
+            style={{ background: 'radial-gradient(closest-side, var(--mint), transparent 70%)' }}
+          />
+        </div>
+        {/* animated liquid orb (extra subtle) */}
+        <div className="absolute -bottom-48 -left-28 w-[420px] h-[420px] rounded-full blur-3xl opacity-8 animate-[orb_18s_ease_infinite]" style={{ background: 'radial-gradient(closest-side, var(--mint), transparent 70%)' }} />
 
         <style jsx global>{`
           @keyframes orb {

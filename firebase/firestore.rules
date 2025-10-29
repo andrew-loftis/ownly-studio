@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // User profiles: users/{uid}
+    match /users/{uid} {
+      // Create only your own profile, with limited fields
+      allow create: if isOwner(uid) &&
+        request.resource.data.keys().hasOnly(['email', 'displayName', 'photoURL', 'createdAt', 'updatedAt', 'plan', 'subscriptionActive']);
+
+      // Read your own profile, or admins can read any
+      allow read: if isOwner(uid) || isAdmin();
+
+      // Update only specific fields on your own profile; admins can update anything
+      allow update: if (isOwner(uid) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt'])) || isAdmin();
+
+      // Delete restricted to admins
+      allow delete: if isAdmin();
+    }
+
+    // Subscriptions are written by server (Admin SDK). Allow users to read their own status.
+    match /subscriptions/{docId} {
+      allow read: if isAdmin() || (isSignedIn() && docId == request.auth.uid);
+      // Client writes not allowed; Admin SDK bypasses these rules on the server.
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Deny everything else by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

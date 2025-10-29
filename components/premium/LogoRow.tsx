@@ -32,7 +32,7 @@ export default function LogoRow({
       
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-1)] via-transparent to-[var(--bg-1)] z-10 pointer-events-none" />
-        <Marquee speed={40} className="opacity-50 hover:opacity-80 transition-opacity duration-500">
+  <Marquee speed={40} className="opacity-100 transition-opacity duration-500">
           {logos.map((logo, index) => (
             <motion.div
               key={`${logo.name}-${index}`}
@@ -40,13 +40,13 @@ export default function LogoRow({
               whileHover={{ scale: 1.1 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="relative p-4 rounded-xl glass group-hover:glass-accent transition-all duration-300">
+              <div className="relative p-3 rounded-lg bg-white/[0.12] border border-white/15 group-hover:bg-white/[0.16] transition-all duration-300">
                 <img
                   src={logo.src}
                   alt={logo.name}
                   width={logo.width || 120}
                   height={logo.height || 60}
-                  className="max-w-[120px] max-h-[60px] object-contain filter brightness-75 group-hover:brightness-100 transition-all duration-300"
+                  className="max-w-[120px] max-h-[60px] object-contain opacity-100 contrast-110 transition-all duration-300"
                 />
               </div>
             </motion.div>
