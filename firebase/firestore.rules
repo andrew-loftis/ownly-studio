@@ -31,60 +31,156 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // Organizations and RBAC
+    // Organizations and RBAC - Enhanced model
     match /orgs/{orgId} {
-      allow read: if isSignedIn() && (
-        isIn(resource.data.adminUids, request.auth.uid) ||
-        isIn(resource.data.editorUids, request.auth.uid) ||
-        isIn(resource.data.clientUids, request.auth.uid) ||
-        isSiteStaff()
-      );
+      function isOrgMember() {
+        return isSignedIn() && (
+          isIn(resource.data.adminUids, request.auth.uid) ||
+          isIn(resource.data.editorUids, request.auth.uid) ||
+          isIn(resource.data.clientUids, request.auth.uid)
+        );
+      }
+      
+      function isOrgAdmin() {
+        return isSignedIn() && isIn(resource.data.adminUids, request.auth.uid);
+      }
+      
+      function isOrgStaff() {
+        return isSignedIn() && (
+          isIn(resource.data.adminUids, request.auth.uid) ||
+          isIn(resource.data.editorUids, request.auth.uid)
+        );
+      }
 
-      // Create org: any signed-in user can create and become admin on that org
+      // Read: org members + site staff
+      allow read: if isOrgMember() || isSiteStaff();
+
+      // Create org: any signed-in user can create and become admin
       allow create: if isSignedIn() &&
         request.resource.data.adminUids is list &&
-        request.auth.uid in request.resource.data.adminUids;
+        request.auth.uid in request.resource.data.adminUids &&
+        request.resource.data.createdBy == request.auth.uid;
 
       // Update/delete org: only org admins or site staff
-      allow update, delete: if isSignedIn() && (
-        isIn(resource.data.adminUids, request.auth.uid) || isSiteStaff()
-      );
+      allow update: if isOrgAdmin() || isSiteStaff();
+      allow delete: if isOrgAdmin() || isSiteStaff();
 
-      // Members (optional future: if you later add subcollection)
-      match /members/{memberUid} {
-        allow read: if isSignedIn() && (request.auth.uid == memberUid || isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) || isSiteStaff());
-        allow write: if isSignedIn() && (isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) || isSiteStaff());
-      }
-
-      // Projects
+      // Projects subcollection
       match /projects/{projectId} {
-        allow read: if isSignedIn() && (
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
-          isIn(resource.data.assignedClientUids, request.auth.uid) ||
-          isSiteStaff()
-        );
-        allow create, update, delete: if isSignedIn() && (
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
-          isSiteStaff()
-        );
+        function isAssignedToProject() {
+          return isSignedIn() && (
+            isIn(resource.data.assignedEditorUids, request.auth.uid) ||
+            isIn(resource.data.assignedClientUids, request.auth.uid)
+          );
+        }
+
+        // Read: org staff + assigned team members + site staff
+        allow read: if isOrgStaff() || isAssignedToProject() || isSiteStaff();
+        
+        // Write: org staff + site staff (clients can't directly modify projects)
+        allow create, update, delete: if isOrgStaff() || isSiteStaff();
+        
+        // Deliverables subcollection
+        match /deliverables/{deliverableId} {
+          function isAssignedToDeliverable() {
+            return isSignedIn() && resource.data.assignedUid == request.auth.uid;
+          }
+          
+          function canClientSeeDeliverable() {
+            return isSignedIn() && 
+              resource.data.visibleToClient == true &&
+              isIn(get(/databases/$(database)/documents/orgs/$(orgId)/projects/$(projectId)).data.assignedClientUids, request.auth.uid);
+          }
+
+          // Read: org staff + assigned person + clients (if visible) + site staff
+          allow read: if isOrgStaff() || isAssignedToDeliverable() || canClientSeeDeliverable() || isSiteStaff();
+          
+          // Write: org staff + assigned person + site staff
+          allow create, update, delete: if isOrgStaff() || isAssignedToDeliverable() || isSiteStaff();
+        }
+        
+        // Milestones subcollection
+        match /milestones/{milestoneId} {
+          // Read: org staff + assigned project members + site staff
+          allow read: if isOrgStaff() || isAssignedToProject() || isSiteStaff();
+          
+          // Write: org staff + site staff
+          allow create, update, delete: if isOrgStaff() || isSiteStaff();
+        }
       }
 
-      // Deliverables
-      match /deliverables/{deliverableId} {
-        allow read: if isSignedIn() && (
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
-          isIn(resource.data.assignedClientUids, request.auth.uid) ||
-          isSiteStaff()
-        );
-        allow create, update, delete: if isSignedIn() && (
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.adminUids, request.auth.uid) ||
-          isIn(get(/databases/$(database)/documents/orgs/$(orgId)).data.editorUids, request.auth.uid) ||
-          isSiteStaff()
-        );
+      // Team members subcollection (optional - for extended user info per org)
+      match /members/{memberUid} {
+        // Read: org members + site staff
+        allow read: if isOrgMember() || isSiteStaff();
+        
+        // Write: org admins + site staff
+        allow create, update, delete: if isOrgAdmin() || isSiteStaff();
       }
+
+      // Invoices subcollection
+      match /invoices/{invoiceId} {
+        function isInvoiceRecipient() {
+          return isSignedIn() && (
+            resource.data.billingEmail == request.auth.token.email ||
+            request.auth.uid in resource.data.sentTo
+          );
+        }
+
+        // Read: org staff + invoice recipients + site staff
+        allow read: if isOrgStaff() || isInvoiceRecipient() || isSiteStaff();
+        
+        // Write: org admins + site staff (invoicing is admin function)
+        allow create, update, delete: if isOrgAdmin() || isSiteStaff();
+      }
+
+      // Activity logs subcollection
+      match /activity/{activityId} {
+        function canClientSeeActivity() {
+          return isSignedIn() && 
+            resource.data.visibleToClient == true &&
+            isIn(resource.data.clientUids, request.auth.uid);
+        }
+
+        // Read: org members + site staff (filtered by visibility for clients)
+        allow read: if isOrgStaff() || canClientSeeActivity() || isSiteStaff();
+        
+        // Create: org members + site staff (for logging actions)
+        allow create: if isOrgMember() || isSiteStaff();
+        
+        // Update/delete: org staff + site staff
+        allow update, delete: if isOrgStaff() || isSiteStaff();
+      }
+
+      // Analytics subcollection
+      match /analytics/{analyticsId} {
+        // Read: org admins + site staff (sensitive financial data)
+        allow read: if isOrgAdmin() || isSiteStaff();
+        
+        // Write: site staff only (analytics are system-generated)
+        allow create, update, delete: if isSiteStaff();
+      }
+
+      // Notification preferences subcollection
+      match /notifications/{uid} {
+        // Read/write: user's own preferences + org admins + site staff
+        allow read, write: if isOwner(uid) || isOrgAdmin() || isSiteStaff();
+      }
+    }
+
+    // Global activity logs (cross-org activities)
+    match /globalActivity/{activityId} {
+      // Read/write: site staff only
+      allow read, write: if isSiteStaff();
+    }
+
+    // System settings and configurations
+    match /settings/{settingId} {
+      // Read: signed in users (for public settings)
+      allow read: if isSignedIn();
+      
+      // Write: site staff only
+      allow create, update, delete: if isSiteStaff();
     }
 
     // Deny everything else by default

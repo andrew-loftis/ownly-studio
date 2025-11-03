@@ -40,6 +40,9 @@
   ],
   "exclude": [
     "node_modules",
-    "firebase/functions/**"
+    "firebase/functions/**",
+    "ADMIN_EXAMPLES/**",
+    "Created_Apps/**",
+    "Created_Sites/**"
   ]
 }

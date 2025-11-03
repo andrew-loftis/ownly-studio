@@ -1,22 +1,10 @@
-[build][build]
-
-  command = "npm run build"  command = "npm run build"
-
+[build]
+  command = "npm run build"
   publish = ".next"
 
 [build.environment]
+  # Next.js 16 requires Node >= 20.9.0. Pin to 20.10.0 for Netlify builds.
+  NODE_VERSION = "20.10.0"
 
-[build.environment]  # Next.js 16 requires Node >= 20.9.0. Pin to 20.10.0 for Netlify builds.
-
-  NODE_VERSION = "20.10.0"  NODE_VERSION = "20.10.0"
-
-
-
-[[plugins]][[plugins]]
-
-  package = "@netlify/plugin-nextjs"  package = "@netlify/plugin-nextjs"
-
-
-
-  
- 
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
