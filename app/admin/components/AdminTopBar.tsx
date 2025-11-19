@@ -22,7 +22,9 @@ const AdminTopBar = ({ onToggleSidebar, sidebarCollapsed, onToggleCollapse }: Ad
   ];
 
   return (
-    <header className="h-16 bg-[var(--bg-2)] border-b border-[var(--bg-4)] flex items-center justify-between px-6">
+    <header className="h-16 bg-[var(--bg-2)]/90 backdrop-blur-xl border-b border-[var(--bg-4)] flex items-center justify-between px-6 relative">
+      {/* Accent underline */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/60 to-transparent"></div>
       {/* Left side */}
       <div className="flex items-center gap-4">
         <button
@@ -40,7 +42,7 @@ const AdminTopBar = ({ onToggleSidebar, sidebarCollapsed, onToggleCollapse }: Ad
         </button>
 
         <div className="hidden sm:block">
-          <h1 className="text-lg font-semibold text-[var(--txt-primary)]">
+          <h1 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-[var(--accent)] to-[var(--cyan)] drop-shadow-[0_2px_10px_rgba(0,0,0,0.2)]">
             Admin Dashboard
           </h1>
         </div>

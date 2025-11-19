@@ -1,180 +1,113 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, collection, query, where, orderBy, limit, startAfter, addDoc, serverTimestamp, getDocs, doc, getDoc } from 'firebase/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { verifyFirebaseIdToken } from '@/lib/server/firebaseAuth';
+import { runQuery, addDocument, fs } from '@/lib/server/firestoreRest';
 import { getUserOrgRole } from '@/lib/roles';
-import { db } from '@/lib/firebase';
 import type { Deliverable } from '@/lib/types/backend';
 
-async function verifyAuth(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw new Error('No authorization token');
-  }
-
-  const token = authHeader.split('Bearer ')[1];
-  const auth = getAuth();
-  const decodedToken = await auth.verifyIdToken(token);
-  return decodedToken;
+// Decode deliverable doc from REST response
+function decodeDeliverable(doc: any): Deliverable {
+  const f = doc.fields || {};
+  return {
+    id: doc.name.split('/').pop(),
+    orgId: f.orgId?.stringValue || '',
+    projectId: f.projectId?.stringValue || '',
+    name: f.name?.stringValue || 'Untitled',
+    description: f.description?.stringValue || '',
+    type: f.type?.stringValue || 'design',
+    status: f.status?.stringValue || 'pending',
+    dueDate: f.dueDate?.timestampValue,
+    completedAt: f.completedAt?.timestampValue,
+    assignedUid: f.assignedUid?.stringValue,
+    reviewerUid: f.reviewerUid?.stringValue,
+    attachments: [],
+    visibleToClient: f.visibleToClient?.booleanValue || false,
+    clientApprovalRequired: f.clientApprovalRequired?.booleanValue || false,
+    clientApproved: f.clientApproved?.booleanValue,
+    clientApprovedAt: f.clientApprovedAt?.timestampValue,
+    clientFeedback: f.clientFeedback?.stringValue,
+    createdBy: f.createdBy?.stringValue || '',
+    createdAt: f.createdAt?.timestampValue,
+    updatedAt: f.updatedAt?.timestampValue,
+  } as any;
 }
 
-// GET /api/admin/deliverables - List deliverables for project or organization
+// GET /api/admin/deliverables
 export async function GET(req: NextRequest) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: 'Firebase not configured' }, { status: 500 });
-    }
-
-    const decodedToken = await verifyAuth(req);
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const idToken = authHeader.slice('Bearer '.length);
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const orgId = searchParams.get('orgId');
     const projectId = searchParams.get('projectId');
-    const status = searchParams.get('status');
-    const pageSize = parseInt(searchParams.get('limit') || '20');
-    const lastDocId = searchParams.get('cursor');
-
-    if (!orgId) {
-      return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
-    }
-
-    // Check user permissions
-    const userRole = await getUserOrgRole(decodedToken.uid, orgId);
-    if (!userRole) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    // Build query
-    let queryConstraints: any[] = [
-      where('orgId', '==', orgId),
-      orderBy('dueDate', 'asc'),
-      limit(pageSize)
+    const statusFilter = searchParams.get('status');
+    const limitParam = parseInt(searchParams.get('limit') || '50');
+    if (!orgId) return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
+    const userRole = await getUserOrgRole(decoded.uid, orgId);
+    if (!userRole) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    const filters: any[] = [
+      { fieldFilter: { field: { fieldPath: 'orgId' }, op: 'EQUAL', value: { stringValue: orgId } } },
     ];
-
-    if (projectId) {
-      queryConstraints.splice(1, 0, where('projectId', '==', projectId));
-    }
-
-    if (status) {
-      queryConstraints.splice(projectId ? 2 : 1, 0, where('status', '==', status));
-    }
-
-    // For clients, only show deliverables marked as visible to client
+    if (projectId) filters.push({ fieldFilter: { field: { fieldPath: 'projectId' }, op: 'EQUAL', value: { stringValue: projectId } } });
+    if (statusFilter) filters.push({ fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: statusFilter } } });
     if (userRole === 'client') {
-      queryConstraints.splice(-2, 0, where('visibleToClient', '==', true));
+      filters.push({ fieldFilter: { field: { fieldPath: 'visibleToClient' }, op: 'EQUAL', value: { booleanValue: true } } });
     }
-
-    if (lastDocId) {
-      const lastDocRef = doc(db, 'deliverables', lastDocId);
-      const lastDocSnap = await getDoc(lastDocRef);
-      if (lastDocSnap.exists()) {
-        queryConstraints.push(startAfter(lastDocSnap));
-      }
-    }
-
-    const deliverablesQuery = query(collection(db, 'deliverables'), ...queryConstraints);
-    const querySnapshot = await getDocs(deliverablesQuery);
-    
-    const deliverables = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Deliverable[];
-
-    const nextCursor = querySnapshot.docs.length === pageSize 
-      ? querySnapshot.docs[querySnapshot.docs.length - 1].id 
-      : null;
-
-    return NextResponse.json({
-      deliverables,
-      nextCursor,
-      hasMore: querySnapshot.docs.length === pageSize
-    });
-
-  } catch (error) {
-    console.error('Error fetching deliverables:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to fetch deliverables' 
-    }, { status: 500 });
+    const structuredQuery: any = {
+      from: [{ collectionGroup: 'deliverables' }],
+      limit: limitParam,
+      orderBy: [{ field: { fieldPath: 'dueDate' }, direction: 'ASCENDING' }],
+      where: filters.length === 1 ? filters[0] : { compositeFilter: { op: 'AND', filters } },
+    };
+    const results = await runQuery(structuredQuery, idToken);
+    const deliverables = results.filter((r: any) => r.document).map((r: any) => decodeDeliverable(r.document));
+    return NextResponse.json({ deliverables, total: deliverables.length });
+  } catch (e: any) {
+    console.error('Deliverables GET error', e);
+    return NextResponse.json({ error: e.message || 'Failed to load deliverables' }, { status: 500 });
   }
 }
 
-// POST /api/admin/deliverables - Create new deliverable
+// POST /api/admin/deliverables
 export async function POST(req: NextRequest) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: 'Firebase not configured' }, { status: 500 });
-    }
-
-    const decodedToken = await verifyAuth(req);
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const idToken = authHeader.slice('Bearer '.length);
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     const body = await req.json();
-    
-    const {
-      orgId,
-      projectId,
-      name,
-      description,
-      type,
-      dueDate,
-      assignedUid,
-      visibleToClient = true,
-      clientApprovalRequired = false
-    } = body;
-
-    // Validate required fields
+    const { orgId, projectId, name, description = '', type, dueDate, assignedUid, visibleToClient = true, clientApprovalRequired = false } = body;
     if (!orgId || !projectId || !name || !type || !dueDate) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: orgId, projectId, name, type, dueDate' 
-      }, { status: 400 });
+      return NextResponse.json({ error: 'Missing required fields: orgId, projectId, name, type, dueDate' }, { status: 400 });
     }
-
-    // Check user permissions
-    const userRole = await getUserOrgRole(decodedToken.uid, orgId);
-    if (!userRole || !['admin', 'editor'].includes(userRole)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    // Verify project exists and user has access
-    const projectRef = doc(db, 'projects', projectId);
-    const projectSnap = await getDoc(projectRef);
-    if (!projectSnap.exists()) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    const project = projectSnap.data();
-    if (project?.orgId !== orgId) {
-      return NextResponse.json({ error: 'Project does not belong to organization' }, { status: 403 });
-    }
-
-    // Create deliverable
-    const deliverableData: Omit<Deliverable, 'id'> = {
-      orgId,
-      projectId,
-      name,
-      description: description || '',
-      type,
-      status: 'pending',
-      dueDate: new Date(dueDate),
-      assignedUid,
-      visibleToClient,
-      clientApprovalRequired,
-      attachments: [],
-      createdAt: serverTimestamp() as any,
-      updatedAt: serverTimestamp() as any,
-      createdBy: decodedToken.uid
+    const userRole = await getUserOrgRole(decoded.uid, orgId);
+    if (!userRole || !['admin', 'editor'].includes(userRole)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    const now = new Date();
+    const deliverableFields: any = {
+      orgId: fs.string(orgId),
+      projectId: fs.string(projectId),
+      name: fs.string(name),
+      description: fs.string(description),
+      type: fs.string(type),
+      status: fs.string('pending'),
+      dueDate: fs.timestamp(new Date(dueDate)),
+      assignedUid: assignedUid ? fs.string(assignedUid) : undefined,
+      visibleToClient: fs.bool(visibleToClient),
+      clientApprovalRequired: fs.bool(clientApprovalRequired),
+      createdBy: fs.string(decoded.uid),
+      createdAt: fs.timestamp(now),
+      updatedAt: fs.timestamp(now),
     };
-
-    const docRef = await addDoc(collection(db, 'deliverables'), deliverableData);
-    
-    return NextResponse.json({
-      id: docRef.id,
-      ...deliverableData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      dueDate: new Date(dueDate)
-    }, { status: 201 });
-
-  } catch (error) {
-    console.error('Error creating deliverable:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to create deliverable' 
-    }, { status: 500 });
+    Object.keys(deliverableFields).forEach((k) => deliverableFields[k] === undefined && delete deliverableFields[k]);
+    const parentPath = `orgs/${orgId}/projects/${projectId}`;
+    const created = await addDocument(parentPath, 'deliverables', deliverableFields, idToken);
+    const id = created.name?.split('/').pop();
+    return NextResponse.json({ id, orgId, projectId, name, status: 'pending', type }, { status: 201 });
+  } catch (e: any) {
+    console.error('Deliverables POST error', e);
+    return NextResponse.json({ error: e.message || 'Failed to create deliverable' }, { status: 500 });
   }
 }

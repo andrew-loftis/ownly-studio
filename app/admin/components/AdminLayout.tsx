@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/authStore';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
 import AdminTopBar from './AdminTopBar';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -72,7 +73,18 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         
         {/* Page Content */}
         <main className="p-6">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={(typeof window !== 'undefined' ? window.location.pathname : 'admin')}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="will-change-transform"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
       

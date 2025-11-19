@@ -1,157 +1,156 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { verifyFirebaseIdToken } from '@/lib/server/firebaseAuth';
+import { runQuery, patchDocument, deleteDocument, fs } from '@/lib/server/firestoreRest';
 import { getUserOrgRole } from '@/lib/roles';
-import { db } from '@/lib/firebase';
-import type { Project, Deliverable, Milestone } from '@/lib/types/backend';
+import type { Project } from '@/lib/types/backend';
 
-async function verifyAuth(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw new Error('No authorization token');
-  }
-
-  const token = authHeader.split('Bearer ')[1];
-  const auth = getAuth();
-  const decodedToken = await auth.verifyIdToken(token);
-  return decodedToken;
+// Helper: find project document across collectionGroup by id
+async function findProjectDoc(projectId: string, idToken: string) {
+  const structuredQuery: any = {
+    from: [{ collectionGroup: 'projects' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: '__name__' },
+        op: 'EQUAL',
+        value: { referenceValue: `projects/${projectId}` } // This direct reference form might not work; fallback below
+      }
+    },
+    limit: 1
+  };
+  // Firestore collectionGroup can't match __name__ with simple reference when nested; fallback to client-side filter.
+  const results = await runQuery({ from: [{ collectionGroup: 'projects' }], limit: 200 }, idToken);
+  const match = results.find((r: any) => r.document && r.document.name.endsWith(`/projects/${projectId}`));
+  return match?.document || null;
 }
 
-// GET /api/admin/projects/[id] - Get single project
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+function decodeProject(document: any): Project | null {
+  if (!document) return null;
+  const f = document.fields || {};
+  const progressFields = f.progress?.mapValue?.fields || {};
+  const quoteFields = f.quote?.mapValue?.fields || {};
+  return {
+    id: document.name.split('/').pop(),
+    orgId: f.orgId?.stringValue || '',
+    name: f.name?.stringValue || 'Untitled',
+    description: f.description?.stringValue || '',
+    status: f.status?.stringValue || 'planning',
+    priority: f.priority?.stringValue || 'medium',
+    startDate: f.startDate?.timestampValue,
+    estimatedEndDate: f.estimatedEndDate?.timestampValue,
+    actualEndDate: f.actualEndDate?.timestampValue,
+    assignedEditorUids: (f.assignedEditorUids?.arrayValue?.values || []).map((v: any) => v.stringValue),
+    assignedClientUids: (f.assignedClientUids?.arrayValue?.values || []).map((v: any) => v.stringValue),
+    projectManager: f.projectManager?.stringValue,
+    features: (f.features?.arrayValue?.values || []).map((v: any) => v.stringValue),
+    quote: {
+      setup: quoteFields.setup?.integerValue ? parseInt(quoteFields.setup.integerValue) : quoteFields.setup?.doubleValue ? parseFloat(quoteFields.setup.doubleValue) : 0,
+      monthly: quoteFields.monthly?.integerValue ? parseInt(quoteFields.monthly.integerValue) : quoteFields.monthly?.doubleValue ? parseFloat(quoteFields.monthly.doubleValue) : 0,
+      breakdown: {},
+      approved: quoteFields.approved?.booleanValue || false,
+      approvedAt: quoteFields.approvedAt?.timestampValue,
+      approvedBy: quoteFields.approvedBy?.stringValue,
+    },
+    progress: {
+      percentage: progressFields.percentage?.integerValue ? parseInt(progressFields.percentage.integerValue) : progressFields.percentage?.doubleValue ? parseFloat(progressFields.percentage.doubleValue) : 0,
+      currentPhase: progressFields.currentPhase?.stringValue || 'Planning',
+      milestonesCompleted: progressFields.milestonesCompleted?.integerValue ? parseInt(progressFields.milestonesCompleted.integerValue) : 0,
+      milestonesTotal: progressFields.milestonesTotal?.integerValue ? parseInt(progressFields.milestonesTotal.integerValue) : 0,
+    },
+    lastClientUpdate: f.lastClientUpdate?.timestampValue,
+    nextCheckIn: f.nextCheckIn?.timestampValue,
+    createdBy: f.createdBy?.stringValue || '',
+    createdAt: f.createdAt?.timestampValue,
+    updatedAt: f.updatedAt?.timestampValue,
+  } as any; // Using any to bypass timestamp typing complexity
+}
+
+// Extract collection path from document name for patch/delete operations
+function getDocumentPath(document: any) {
+  return document.name.split(`projects/${document.name.split('/').pop()}`)[0] + `projects/${document.name.split('/').pop()}`;
+}
+
+// GET /api/admin/projects/[id]
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: 'Firebase not configured' }, { status: 500 });
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const idToken = authHeader.slice('Bearer '.length);
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
-    const decodedToken = await verifyAuth(req);
-    const { id: projectId } = await params;
+  const { id } = await params;
+  const projectDoc = await findProjectDoc(id, idToken);
+    if (!projectDoc) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    const project = decodeProject(projectDoc)!;
 
-    const projectRef = doc(db, 'projects', projectId);
-    const projectSnap = await getDoc(projectRef);
-
-    if (!projectSnap.exists()) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-
-    // Check user permissions
-    const userRole = await getUserOrgRole(decodedToken.uid, project.orgId);
-    if (!userRole) {
+    const userRole = await getUserOrgRole(decoded.uid, project.orgId);
+    if (!userRole) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    if (userRole === 'client' && !project.assignedClientUids.includes(decoded.uid)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
-
-    // Clients can only see projects they're assigned to
-    if (userRole === 'client' && !project.assignedClientUids.includes(decodedToken.uid)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
     return NextResponse.json(project);
-
-  } catch (error) {
-    console.error('Error fetching project:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to fetch project' 
-    }, { status: 500 });
+  } catch (e: any) {
+    console.error('Project GET error', e);
+    return NextResponse.json({ error: e.message || 'Failed to load project' }, { status: 500 });
   }
 }
 
-// PUT /api/admin/projects/[id] - Update project
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// PUT /api/admin/projects/[id]
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: 'Firebase not configured' }, { status: 500 });
-    }
-
-    const decodedToken = await verifyAuth(req);
-    const { id: projectId } = await params;
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const idToken = authHeader.slice('Bearer '.length);
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+  const { id } = await params;
+  const projectDoc = await findProjectDoc(id, idToken);
+    if (!projectDoc) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    const project = decodeProject(projectDoc)!;
+    const userRole = await getUserOrgRole(decoded.uid, project.orgId);
+    if (!userRole || !['admin', 'editor'].includes(userRole)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     const updates = await req.json();
-
-    const projectRef = doc(db, 'projects', projectId);
-    const projectSnap = await getDoc(projectRef);
-
-    if (!projectSnap.exists()) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    const project = projectSnap.data() as Project;
-
-    // Check user permissions
-    const userRole = await getUserOrgRole(decodedToken.uid, project.orgId);
-    if (!userRole || !['admin', 'editor'].includes(userRole)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    // Prepare update data
-    const updateData: any = {
-      ...updates,
-      updatedAt: serverTimestamp()
-    };
-
-    // Remove fields that shouldn't be updated directly
-    delete updateData.id;
-    delete updateData.orgId;
-    delete updateData.createdAt;
-    delete updateData.createdBy;
-
-    await updateDoc(projectRef, updateData);
-
-    const updatedProjectSnap = await getDoc(projectRef);
-    const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() };
-
-    return NextResponse.json(updatedProject);
-
-  } catch (error) {
-    console.error('Error updating project:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to update project' 
-    }, { status: 500 });
+    // Build Firestore REST field map
+    const updateFields: any = {};
+    Object.entries(updates).forEach(([k, v]) => {
+      if (['id', 'orgId', 'createdAt', 'createdBy'].includes(k)) return; // protect
+      if (typeof v === 'string') updateFields[k] = fs.string(v);
+      else if (typeof v === 'number') updateFields[k] = fs.number(v);
+      else if (typeof v === 'boolean') updateFields[k] = fs.bool(v);
+    });
+    updateFields.updatedAt = fs.timestamp(new Date());
+    const docPath = projectDoc.name.split(`/documents/`)[1];
+    await patchDocument(docPath, updateFields, idToken);
+    // Re-fetch
+  const refreshed = await findProjectDoc(id, idToken);
+    return NextResponse.json(decodeProject(refreshed));
+  } catch (e: any) {
+    console.error('Project PUT error', e);
+    return NextResponse.json({ error: e.message || 'Failed to update project' }, { status: 500 });
   }
 }
 
-// DELETE /api/admin/projects/[id] - Delete project
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// DELETE /api/admin/projects/[id]
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: 'Firebase not configured' }, { status: 500 });
-    }
-
-    const decodedToken = await verifyAuth(req);
-    const { id: projectId } = await params;
-
-    const projectRef = doc(db, 'projects', projectId);
-    const projectSnap = await getDoc(projectRef);
-
-    if (!projectSnap.exists()) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    const project = projectSnap.data() as Project;
-
-    // Check user permissions - only admins can delete projects
-    const userRole = await getUserOrgRole(decodedToken.uid, project.orgId);
-    if (!userRole || userRole !== 'admin') {
-      return NextResponse.json({ error: 'Only admins can delete projects' }, { status: 403 });
-    }
-
-    await deleteDoc(projectRef);
-
-    return NextResponse.json({ message: 'Project deleted successfully' });
-
-  } catch (error) {
-    console.error('Error deleting project:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to delete project' 
-    }, { status: 500 });
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const idToken = authHeader.slice('Bearer '.length);
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+  const { id } = await params;
+  const projectDoc = await findProjectDoc(id, idToken);
+    if (!projectDoc) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    const project = decodeProject(projectDoc)!;
+    const userRole = await getUserOrgRole(decoded.uid, project.orgId);
+    if (!userRole || userRole !== 'admin') return NextResponse.json({ error: 'Only admins can delete projects' }, { status: 403 });
+    const docPath = projectDoc.name.split(`/documents/`)[1];
+    await deleteDocument(docPath, idToken);
+    return NextResponse.json({ deleted: true });
+  } catch (e: any) {
+    console.error('Project DELETE error', e);
+    return NextResponse.json({ error: e.message || 'Failed to delete project' }, { status: 500 });
   }
 }

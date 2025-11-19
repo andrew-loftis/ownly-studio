@@ -47,6 +47,14 @@ export async function patchDocument(docName: string, fields: any, idToken: strin
   return res.json();
 }
 
+export async function deleteDocument(docName: string, idToken: string) {
+  const res = await authedFetch(`${BASE}/${encodeURIComponent(docName)}`, idToken, {
+    method: 'DELETE',
+  });
+  // Firestore REST DELETE returns empty body; normalize to success indicator
+  return { deleted: true };
+}
+
 // Helpers to encode basic Firestore Value types
 export const fs = {
   string: (v: string) => ({ stringValue: v }),

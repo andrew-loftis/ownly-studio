@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
 import { z } from "zod";
 import { 
   getSubscriptionStatus, 
   updateSubscription, 
   cancelSubscription 
 } from "@/lib/stripe/utils";
-import { getOrganization } from "@/lib/api/organizations";
+import { verifyFirebaseIdToken } from "@/lib/server/firebaseAuth";
+import { getDocument, patchDocument, fs } from "@/lib/server/firestoreRest";
 
 const updateSubscriptionSchema = z.object({
   features: z.array(z.string()),
@@ -32,35 +31,32 @@ export async function GET(
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const idToken = authHeader.split("Bearer ")[1];
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-    const token = authHeader.split("Bearer ")[1];
-    const auth = getAuth();
-    const decodedToken = await auth.verifyIdToken(token);
-    const userId = decodedToken.uid;
-
-    // Get organization and verify access
-    const db = getFirestore();
-    const orgDoc = await db.collection("organizations").doc(orgId).get();
-    
-    if (!orgDoc.exists) {
+    // Get organization and verify access (admin or editor)
+    const orgDoc = await getDocument(`orgs/${orgId}`, idToken).catch(() => null);
+    if (!orgDoc?.fields) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
-
-    const orgData = orgDoc.data();
-    if (!orgData?.adminUids?.includes(userId) && !orgData?.editorUids?.includes(userId)) {
+    const f = orgDoc.fields;
+    const adminUids = f.adminUids?.arrayValue?.values?.map((v: any) => v.stringValue) || [];
+    const editorUids = f.editorUids?.arrayValue?.values?.map((v: any) => v.stringValue) || [];
+    if (!adminUids.includes(decoded.uid) && !editorUids.includes(decoded.uid)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     // Get Stripe subscription status
-    if (!orgData.subscription?.stripeSubscriptionId) {
+    const subFields = f.subscription?.mapValue?.fields || {};
+    const stripeSubId = subFields.stripeSubscriptionId?.stringValue;
+    if (!stripeSubId) {
       return NextResponse.json({ 
         error: "No active subscription found" 
       }, { status: 404 });
     }
 
-    const subscriptionStatus = await getSubscriptionStatus(
-      orgData.subscription.stripeSubscriptionId
-    );
+    const subscriptionStatus = await getSubscriptionStatus(stripeSubId);
 
     return NextResponse.json(subscriptionStatus);
   } catch (error: any) {
@@ -88,43 +84,44 @@ export async function PUT(
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const token = authHeader.split("Bearer ")[1];
-    const auth = getAuth();
-    const decodedToken = await auth.verifyIdToken(token);
-    const userId = decodedToken.uid;
+    const idToken = authHeader.split("Bearer ")[1];
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
     // Get organization and verify admin access
-    const db = getFirestore();
-    const orgDoc = await db.collection("organizations").doc(orgId).get();
-    
-    if (!orgDoc.exists) {
+    const orgDoc = await getDocument(`orgs/${orgId}`, idToken).catch(() => null);
+    if (!orgDoc?.fields) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
-
-    const orgData = orgDoc.data();
-    if (!orgData?.adminUids?.includes(userId)) {
+    const f = orgDoc.fields;
+    const adminUids = f.adminUids?.arrayValue?.values?.map((v: any) => v.stringValue) || [];
+    if (!adminUids.includes(decoded.uid)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
     // Update Stripe subscription
-    if (!orgData.subscription?.stripeSubscriptionId) {
+    const subFields = f.subscription?.mapValue?.fields || {};
+    const stripeSubId = subFields.stripeSubscriptionId?.stringValue;
+    if (!stripeSubId) {
       return NextResponse.json({ 
         error: "No active subscription to update" 
       }, { status: 404 });
     }
 
-    const updatedSubscription = await updateSubscription(
-      orgData.subscription.stripeSubscriptionId,
-      features as any
-    );
+    const updatedSubscription = await updateSubscription(stripeSubId, features as any);
 
-    // Update organization in Firestore
-    await db.collection("organizations").doc(orgId).update({
-      "subscription.features": features,
-      "subscription.plan": features.join(" + "),
-      updatedAt: new Date(),
-    });
+    // Build new subscription map by merging existing
+    const newSubMap: any = {
+      ...Object.fromEntries(Object.entries(subFields).map(([k, v]: any) => [k, v])),
+      features: { arrayValue: { values: features.map((f: string) => fs.string(f)) } },
+      plan: fs.string(features.join(" + ")),
+    };
+
+    // Patch subscription map and updatedAt
+    await patchDocument(`orgs/${orgId}`, {
+      subscription: { mapValue: { fields: newSubMap } },
+      updatedAt: fs.timestamp(new Date()),
+    }, idToken);
 
     return NextResponse.json({ 
       success: true, 
@@ -155,48 +152,44 @@ export async function DELETE(
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const token = authHeader.split("Bearer ")[1];
-    const auth = getAuth();
-    const decodedToken = await auth.verifyIdToken(token);
-    const userId = decodedToken.uid;
+    const idToken = authHeader.split("Bearer ")[1];
+    const decoded = await verifyFirebaseIdToken(idToken).catch(() => null);
+    if (!decoded?.uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
     // Get organization and verify admin access
-    const db = getFirestore();
-    const orgDoc = await db.collection("organizations").doc(orgId).get();
-    
-    if (!orgDoc.exists) {
+    const orgDoc = await getDocument(`orgs/${orgId}`, idToken).catch(() => null);
+    if (!orgDoc?.fields) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
-
-    const orgData = orgDoc.data();
-    if (!orgData?.adminUids?.includes(userId)) {
+    const f = orgDoc.fields;
+    const adminUids = f.adminUids?.arrayValue?.values?.map((v: any) => v.stringValue) || [];
+    if (!adminUids.includes(decoded.uid)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
     // Cancel Stripe subscription
-    if (!orgData.subscription?.stripeSubscriptionId) {
+    const subFields = f.subscription?.mapValue?.fields || {};
+    const stripeSubId = subFields.stripeSubscriptionId?.stringValue;
+    if (!stripeSubId) {
       return NextResponse.json({ 
         error: "No active subscription to cancel" 
       }, { status: 404 });
     }
+    const canceledSubscription = await cancelSubscription(stripeSubId, immediately);
 
-    const canceledSubscription = await cancelSubscription(
-      orgData.subscription.stripeSubscriptionId,
-      immediately
-    );
-
-    // Update organization in Firestore
-    const updateData: any = {
-      "subscription.active": false,
-      updatedAt: new Date(),
+    // Build new subscription map with active=false and optional canceledAt
+    const newSubMap: any = {
+      ...Object.fromEntries(Object.entries(subFields).map(([k, v]: any) => [k, v])),
+      active: fs.bool(false),
     };
-
     if (immediately) {
-      updateData["subscription.canceledAt"] = new Date();
+      newSubMap.canceledAt = fs.timestamp(new Date());
     }
 
-    await db.collection("organizations").doc(orgId).update(updateData);
+    await patchDocument(`orgs/${orgId}`, {
+      subscription: { mapValue: { fields: newSubMap } },
+      updatedAt: fs.timestamp(new Date()),
+    }, idToken);
 
     return NextResponse.json({ 
       success: true, 

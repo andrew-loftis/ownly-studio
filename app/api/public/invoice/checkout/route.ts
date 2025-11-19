@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFirestore } from "firebase-admin/firestore";
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-09-30.clover",
-});
+import { getAdminDb } from "@/lib/firebaseAdmin";
+import { getStripe } from "@/lib/stripe";
 
 /**
  * POST /api/public/invoice/checkout - Create Stripe checkout session for invoice payment
@@ -18,7 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get invoice from Firestore
-    const db = getFirestore();
+    const db = getAdminDb();
     const invoicesSnapshot = await db.collection("invoices")
       .where("invoiceNumber", "==", invoiceNumber)
       .limit(1)
@@ -43,6 +39,7 @@ export async function POST(req: NextRequest) {
     const orgData = orgDoc.exists ? orgDoc.data() : null;
 
     // Create Stripe checkout session
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",

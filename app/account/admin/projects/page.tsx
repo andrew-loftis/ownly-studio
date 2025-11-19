@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/lib/authStore';
 import { getUserOrgRole } from '@/lib/roles';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -238,8 +239,22 @@ export default function ProjectsPage({ searchParams }: ProjectsPageProps) {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <AnimatePresence>
             {filteredProjects.map((project) => (
-              <div key={project.id} className="glass-strong rounded-xl p-6 hover:bg-white/5 transition-colors">
+              <motion.div
+                key={project.id}
+                layout
+                initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -12, scale: 0.95 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ scale: 1.02, transition: { duration: 0.25 } }}
+                className="glass-strong rounded-xl p-6 hover:bg-white/5 transition-colors relative overflow-hidden group"
+              >
+                <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[var(--mint)]/0 via-[var(--mint)]/5 to-[var(--cyan)]/10 mix-blend-overlay" />
+                  <div className="absolute -inset-[2px] rounded-xl border border-transparent group-hover:border-[var(--border-accent)]/40" />
+                </div>
                 {/* Project Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -320,16 +335,30 @@ export default function ProjectsPage({ searchParams }: ProjectsPageProps) {
                     </Button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ))}
+          </AnimatePresence>
           </div>
         )}
       </div>
 
       {/* Create Project Modal Placeholder */}
+      <AnimatePresence>
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="glass-strong rounded-xl p-6 w-full max-w-md">
+        <motion.div
+          initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 24, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.9, y: -12, opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="glass-strong rounded-2xl p-6 w-full max-w-md relative overflow-hidden"
+          >
+            <div className="absolute inset-0 opacity-20 bg-gradient-to-br from-[var(--mint)]/10 via-transparent to-[var(--cyan)]/20" />
             <h3 className="text-lg font-semibold text-[var(--txt-primary)] mb-4">Create Project</h3>
             <p className="text-[var(--txt-secondary)] mb-4">
               Project creation form will be implemented here.
@@ -342,9 +371,10 @@ export default function ProjectsPage({ searchParams }: ProjectsPageProps) {
                 Create
               </Button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </AdminLayout>
   );
 }

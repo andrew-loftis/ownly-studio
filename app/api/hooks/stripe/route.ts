@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import Stripe from "stripe";
-import { getFirestore } from "firebase-admin/firestore";
 import type { WebhookHandler, SubscriptionStatus } from "@/lib/stripe/types";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-09-30.clover",
-});
-
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+import { getStripe } from "@/lib/stripe";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
 /**
  * POST /api/hooks/stripe - Handle Stripe webhooks
@@ -25,13 +19,17 @@ export async function POST(req: NextRequest) {
     let event: Stripe.Event;
 
     try {
+      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!endpointSecret) {
+        return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+      }
+      const stripe = getStripe();
       event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
-
-    const db = getFirestore();
+    const db = getAdminDb();
     
     // Handle different event types
     switch (event.type) {
@@ -162,6 +160,7 @@ async function handleInvoicePaymentSucceeded(
   if (!orgId) {
     // Try to get orgId from subscription
     if ((invoice as any).subscription) {
+      const stripe = getStripe();
       const subscription = await stripe.subscriptions.retrieve((invoice as any).subscription as string);
       const fallbackOrgId = subscription.metadata.orgId;
       if (!fallbackOrgId) {
