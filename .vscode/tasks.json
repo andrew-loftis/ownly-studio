@@ -1,15 +1,37 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Build & Deploy (Netlify prod)",
-      "type": "shell",
-      "command": "npm run build; netlify deploy --prod",
-      "group": "build",
-      "problemMatcher": ["$eslint-stylish"],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      }
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build & Deploy (Netlify prod)",
+			"type": "shell",
+			"command": "npm run build; netlify deploy --prod",
+			"group": "build",
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Build & Deploy (Netlify prod)",
+			"type": "shell",
+			"command": "npm run build; netlify deploy --prod"
+		},
+		{
+			"label": "Build & Deploy (Netlify prod)",
+			"type": "shell",
+			"command": "npm run build; netlify deploy --prod"
+		},
+		{
+			"label": "Build & Deploy (Netlify prod)",
+			"type": "shell",
+			"command": "npm run build; netlify deploy --prod"
+		},
+		{
+			"label": "Build & Deploy (Netlify prod)",
+			"type": "shell",
+			"command": "npm run build; netlify deploy --prod"
+		}
+	]
 }

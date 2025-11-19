@@ -4,7 +4,18 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
-    function isSiteStaff() { return isSignedIn() && (request.auth.token.admin == true || request.auth.token.siteRole in ['superadmin', 'staff']); }
+    function isSiteStaff() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.siteRole in ['superadmin', 'staff'] ||
+        // Fallback: treat Ownly Studio and Aloft emails as site staff when custom claims aren't available
+        (request.auth.token.email != null && (
+          request.auth.token.email.matches('.*@ownly\\.studio$') ||
+          request.auth.token.email.matches('.*aloft.*') ||
+          request.auth.token.email == 'andrew@houseofkna.com'
+        ))
+      );
+    }
     function isIn(arr, val) { return arr != null && val in arr; }
 
     // User profiles: users/{uid}

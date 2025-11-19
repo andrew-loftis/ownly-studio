@@ -136,13 +136,21 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-[var(--txt-primary)]">Admin Dashboard</h1>
           <p className="text-[var(--txt-secondary)] mt-2">Manage your organizations and projects</p>
         </div>
-        <button
-          className="px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--mint)] to-[var(--cyan)] text-black font-semibold hover:scale-[1.02] hover:-translate-y-0.5 transition-all disabled:opacity-50"
-          onClick={handleCreateOrg}
-          disabled={creating}
-        >
-          {creating ? "Creating..." : "Create Organization"}
-        </button>
+        <div className="flex gap-3">
+          <a
+            href="/account/admin/analytics"
+            className="px-4 py-2 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] font-medium hover:bg-[var(--accent)]/10 hover:scale-[1.02] hover:-translate-y-0.5 transition-all"
+          >
+            View Analytics
+          </a>
+          <button
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--mint)] to-[var(--cyan)] text-black font-semibold hover:scale-[1.02] hover:-translate-y-0.5 transition-all disabled:opacity-50"
+            onClick={handleCreateOrg}
+            disabled={creating}
+          >
+            {creating ? "Creating..." : "Create Organization"}
+          </button>
+        </div>
       </div>
 
       {/* Statistics Overview */}
